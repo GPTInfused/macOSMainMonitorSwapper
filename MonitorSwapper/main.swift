@@ -6,88 +6,136 @@
 //
 
 import Foundation
-import CoreGraphics
 import AppKit
 import CoreGraphics
 
-let MAX_DISPLAYS: UInt32 = 32
+private let supportedNumberOfScreens = 2
 
-func swapDisplays() {
-    let allScreens = NSScreen.screens
+// Run the swap displays function
+swapDisplays()
 
-    guard allScreens.count == 2 else {
-        print("ERROR: swapDisplays only supports 2 screens")
+private func swapDisplays() {
+    guard let (mainScreen, secondaryScreen) = screens() else {
         return
     }
 
-    var activeDisplays = [CGDirectDisplayID](repeating: 0, count: Int(MAX_DISPLAYS))
-    var displayCount: UInt32 = 0
-    let err = CGGetActiveDisplayList(MAX_DISPLAYS, &activeDisplays, &displayCount)
-
-    guard err == .success else {
-        print("Error: Cannot get active displays")
-        return
-    }
-
-    var mainDisplayID: CGDirectDisplayID?
-    var secondaryDisplayID: CGDirectDisplayID?
-
-    for i in 0..<displayCount {
-        let displayID = activeDisplays[Int(i)]
-        let bounds = CGDisplayBounds(displayID)
-
-        if bounds.origin.x == 0 && bounds.origin.y == 0 {
-            mainDisplayID = displayID
-        } else {
-            secondaryDisplayID = displayID
-        }
-    }
-
-    guard let currentMainID = mainDisplayID, let newMainID = secondaryDisplayID else {
-        print("Error: Could not determine main and secondary displays")
-        return
-    }
-
-    print("Current main display: \(currentMainID)")
-    print("Switching main display to: \(newMainID)")
-
-    setMainDisplay(newMainID, relativeTo: currentMainID)
+    set(mainDisplay: secondaryScreen, relativeTo: mainScreen)
 }
 
-func setMainDisplay(_ newMainID: CGDirectDisplayID, relativeTo currentMainID: CGDirectDisplayID) {
+private func error(_ message: String) -> Never {
+    print("Error: \(message)")
+
+    exit(1)
+}
+
+private func screens() -> (main: NSScreen, secondary: NSScreen)? {
+    let screens = NSScreen.screens
+
+    guard screens.count == supportedNumberOfScreens else {
+        error("swapDisplays only supports \(supportedNumberOfScreens) screens")
+    }
+
+    guard
+        let mainScreen = screens.first(where: { $0.frame.origin == .zero }),
+        let secondaryScreen = screens.first(where: { $0.frame.origin != .zero })
+    else {
+        error("Could not determine main and secondary screens")
+    }
+
+    return (main: mainScreen, secondary: secondaryScreen)
+}
+
+private func set(mainDisplay newMainScreen: NSScreen, relativeTo currentMainScrren: NSScreen) {
+    guard
+        let currentMainScreenID = currentMainScrren.displayID,
+        let newMainScreenID = newMainScreen.displayID
+    else {
+        error("Could not determine main and secondary displays")
+    }
+
+    print("Current main screen: \(currentMainScreenID)")
+    print("Switching main screen to: \(newMainScreenID)")
+
+    // Position displays the same as before
+    let newCurrentMainScreenFrame = currentMainScrren.frame.convert(
+        to: newMainScreen
+    )
+
+    let x = Int32(newCurrentMainScreenFrame.origin.x)
+    let y = Int32(newCurrentMainScreenFrame.origin.y)
+
+    print("Setting current main screen's new origin at (x: \(x), y: \(y))")
+
     var optionalConfigRef: CGDisplayConfigRef?
-    let configState = CGBeginDisplayConfiguration(&optionalConfigRef)
+    var configState: CGError
+
+    configState = CGBeginDisplayConfiguration(&optionalConfigRef)
 
     guard
         configState == .success,
         let configRef = optionalConfigRef
     else {
-        print("Error: Could not begin display configuration")
-        return
+        error("Could not begin display configuration")
+    }
+
+    configState = CGConfigureDisplayOrigin(
+        configRef,
+        currentMainScreenID,
+        x,
+        -y // NOTE: Somehow, `CGConfigureDisplayOrigin` set the `y` at `-y`... So we flip it here.
+    )
+
+    if configState != .success {
+        print("Error: Could not set current display's new origin")
     }
 
     // Make the new main display the primary display (at 0,0)
-    CGConfigureDisplayOrigin(configRef, newMainID, 0, 0)
+    configState = CGConfigureDisplayOrigin(configRef, newMainScreenID, 0, 0)
 
-    // Position the old main display relative to the new main display
-    let newMainWidth = CGDisplayPixelsWide(newMainID)
-
-    CGConfigureDisplayOrigin(
-        configRef,
-        currentMainID,
-        Int32(newMainWidth),
-        0
-    ) // Place it to the right
+    if configState != .success {
+        print("Error: Could not set new display's new origin")
+    }
 
     // Apply the configuration
-    let applyErr = CGCompleteDisplayConfiguration(configRef, .permanently)
+    configState = CGCompleteDisplayConfiguration(configRef, .permanently)
 
-    if applyErr == .success {
+    if configState == .success {
         print("Display configuration successfully updated.")
     } else {
-        print("Error: Could not complete display configuration")
+        error("Could not complete display configuration")
     }
 }
 
-// Run the swap displays function
-swapDisplays()
+private extension NSDeviceDescriptionKey {
+    static let screenNumber = NSDeviceDescriptionKey(rawValue: "NSScreenNumber")
+}
+
+
+private extension NSScreen {
+    var displayID: CGDirectDisplayID? {
+        guard
+            let nsScreenNumber = deviceDescription[NSDeviceDescriptionKey.screenNumber] as? NSNumber
+        else {
+            print("Error: Cannot find display ID")
+
+            return nil
+        }
+
+        let displayID = CGDirectDisplayID(nsScreenNumber.intValue)
+
+        return displayID
+    }
+}
+
+private extension CGRect {
+    func convert(to targetScreen: NSScreen) -> CGRect {
+        let targetScreenOrigin = targetScreen.frame.origin
+
+        let newOrigin = CGPoint(
+            x: origin.x - targetScreenOrigin.x,
+            y: origin.y - targetScreenOrigin.y
+        )
+
+        return CGRect(origin: newOrigin, size: size)
+    }
+}
