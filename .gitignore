@@ -1,5 +1,5 @@
-# Created by https://www.toptal.com/developers/gitignore/api/swift,xcode,macos,python,vim
-# Edit at https://www.toptal.com/developers/gitignore?templates=swift,xcode,macos,python,vim
+# Created by https://www.toptal.com/developers/gitignore/api/vim,macos,swift,python,swiftpackagemanager
+# Edit at https://www.toptal.com/developers/gitignore?templates=vim,macos,swift,python,swiftpackagemanager
 
 ### macOS ###
 # General
@@ -250,7 +250,7 @@ playground.xcworkspace
 # *.xcodeproj
 # Xcode automatically generates this directory with a .xcworkspacedata file and xcuserdata
 # hence it is not needed unless you have added a package configuration file to your project
-# .swiftpm
+.swiftpm
 
 .build/
 
@@ -289,6 +289,12 @@ fastlane/test_output
 
 iOSInjectionProject/
 
+### SwiftPackageManager ###
+Packages
+xcuserdata
+*.xcodeproj
+
+
 ### Vim ###
 # Swap
 [._]*.s[a-v][a-z]
@@ -310,17 +316,4 @@ tags
 # Persistent undo
 [._]*.un~
 
-### Xcode ###
-
-## Xcode 8 and earlier
-
-### Xcode Patch ###
-*.xcodeproj/*
-!*.xcodeproj/project.pbxproj
-!*.xcodeproj/xcshareddata/
-!*.xcodeproj/project.xcworkspace/
-!*.xcworkspace/contents.xcworkspacedata
-/*.gcno
-**/xcshareddata/WorkspaceSettings.xcsettings
-
-# End of https://www.toptal.com/developers/gitignore/api/swift,xcode,macos,python,vim
+# End of https://www.toptal.com/developers/gitignore/api/vim,macos,swift,python,swiftpackagemanager
